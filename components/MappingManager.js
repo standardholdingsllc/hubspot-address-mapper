@@ -29,7 +29,11 @@ export default function MappingManager({ mappings, onMappingAdded }) {
       const data = await response.json();
 
       if (data.success) {
-        setSuccess('Mapping added successfully!');
+        if (data.persistent) {
+          setSuccess(data.message || 'Mapping added and saved to GitHub repository!');
+        } else {
+          setSuccess((data.message || 'Mapping added successfully!') + (data.warning ? ` (${data.warning})` : ''));
+        }
         setFormData({ addressStreet: '', company: '', companyName: '' });
         setShowAddForm(false);
         onMappingAdded();
