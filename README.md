@@ -5,11 +5,13 @@ A modern web application for mapping addresses to company information in Excel f
 ## Features
 
 - **File Upload**: Drag & drop or click to upload Excel files (.xlsx, .xls)
+- **User Filtering**: Automatically remove test/demo accounts during upload
 - **Address Mapping**: Automatically map addresses to company information
 - **Mapping Management**: Add new address mappings through the web interface
-- **View Mappings**: Browse all existing address mappings
+- **Advanced Search**: Dedicated search pages with table and JSON views
+- **Exclusion Management**: Add/remove usernames from the exclusion list
 - **Excel Processing**: Add Company, Company Name, and Lifestyle Stage columns
-- **Download Results**: Download processed Excel files with highlighted unmatched rows
+- **Download Results**: Download processed Excel files
 - **Modern UI**: Clean, responsive design with progress tracking
 
 ## Getting Started
@@ -66,12 +68,16 @@ Unmatched rows are highlighted in orange for easy identification.
 
 ## API Endpoints
 
-- `POST /api/upload` - Upload and validate Excel files
+- `POST /api/upload` - Upload, validate, and filter Excel files
 - `POST /api/process` - Process uploaded files with address mappings
 - `GET /api/download` - Download processed files
 - `GET /api/mappings` - Retrieve all address mappings
 - `POST /api/mappings` - Add new address mappings
 - `DELETE /api/mappings` - Delete existing mappings
+- `GET /api/names` - Retrieve excluded usernames
+- `POST /api/names` - Add username to exclusion list
+- `DELETE /api/names` - Remove username from exclusion list
+- `POST /api/filter-users` - Filter users from Excel data
 
 ## Technology Stack
 

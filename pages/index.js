@@ -106,8 +106,17 @@ export default function Home() {
                     <h3 className="font-semibold text-blue-900">File Information</h3>
                     <p className="text-blue-700">Name: {uploadedFile.fileName}</p>
                     <p className="text-blue-700">Rows: {uploadedFile.rowCount}</p>
+                    {uploadedFile.originalRowCount && uploadedFile.originalRowCount !== uploadedFile.rowCount && (
+                      <p className="text-orange-700">Original Rows: {uploadedFile.originalRowCount} (filtered)</p>
+                    )}
                     <p className="text-blue-700">AddressStreet Column: {uploadedFile.addressStreetColumn}</p>
                     <p className="text-blue-700">Columns Added: {uploadedFile.columnsAdded?.join(', ')}</p>
+                    {uploadedFile.filteringApplied && (
+                      <p className="text-orange-700">
+                        🚫 Filtered out {uploadedFile.usersRemoved} excluded user{uploadedFile.usersRemoved !== 1 ? 's' : ''} 
+                        from column "{uploadedFile.usernameColumn}"
+                      </p>
+                    )}
                     {uploadedFile.message && (
                       <p className="text-blue-600 font-medium mt-2">{uploadedFile.message}</p>
                     )}

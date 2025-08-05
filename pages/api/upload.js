@@ -92,15 +92,87 @@ export default async function handler(req, res) {
     // Clean up original uploaded file
     fs.unlinkSync(file.filepath);
 
-    res.status(200).json({
-      success: true,
-      fileId,
-      fileName: file.originalFilename,
-      rowCount: processedData.length,
-      addressStreetColumn,
-      columnsAdded: ['Company', 'Company Name', 'Lifestyle Stage'],
-      message: 'File uploaded and prepared with new columns'
-    });
+    // Apply user filtering immediately after upload
+    try {
+      // Read excluded names and filter directly
+      const namesPath = path.join(process.cwd(), 'names.json');
+      let excludedNames = [];
+      let filterData = { success: true, removedCount: 0 };
+      
+      try {
+        excludedNames = JSON.parse(fs.readFileSync(namesPath, 'utf8'));
+        
+        if (excludedNames.length > 0) {
+          // Filter the processed data
+          const columns = Object.keys(processedData[0]);
+          const usernameColumn = columns[0]; // First column (Column A)
+          
+          const originalCount = processedData.length;
+          const filteredData = processedData.filter(row => {
+            const username = row[usernameColumn];
+            if (!username) return true;
+            return !excludedNames.includes(username.toString().toLowerCase());
+          });
+          
+          if (filteredData.length < originalCount) {
+            // Re-save the filtered file
+            const newWorkbook = XLSX.utils.book_new();
+            const newWorksheet = XLSX.utils.json_to_sheet(filteredData);
+            XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, sheetName);
+            XLSX.writeFile(newWorkbook, tempFilePath);
+            
+            filterData = {
+              success: true,
+              removedCount: originalCount - filteredData.length,
+              filteredCount: filteredData.length,
+              usernameColumn
+            };
+          }
+        }
+      } catch (namesError) {
+        console.log('No excluded names file found, skipping user filtering');
+      }
+      
+      if (filterData.success && filterData.removedCount > 0) {
+        res.status(200).json({
+          success: true,
+          fileId,
+          fileName: file.originalFilename,
+          rowCount: filterData.filteredCount,
+          originalRowCount: processedData.length,
+          addressStreetColumn,
+          columnsAdded: ['Company', 'Company Name', 'Lifestyle Stage'],
+          message: 'File uploaded and prepared with new columns',
+          filteringApplied: true,
+          usersRemoved: filterData.removedCount,
+          usernameColumn: filterData.usernameColumn
+        });
+      } else {
+        res.status(200).json({
+          success: true,
+          fileId,
+          fileName: file.originalFilename,
+          rowCount: processedData.length,
+          addressStreetColumn,
+          columnsAdded: ['Company', 'Company Name', 'Lifestyle Stage'],
+          message: 'File uploaded and prepared with new columns',
+          filteringApplied: false
+        });
+      }
+    } catch (filterError) {
+      console.error('User filtering failed:', filterError);
+      // Continue without filtering if it fails
+      res.status(200).json({
+        success: true,
+        fileId,
+        fileName: file.originalFilename,
+        rowCount: processedData.length,
+        addressStreetColumn,
+        columnsAdded: ['Company', 'Company Name', 'Lifestyle Stage'],
+        message: 'File uploaded and prepared with new columns (user filtering skipped due to error)',
+        filteringApplied: false
+      });
+    }
 
   } catch (error) {
     console.error('Upload error:', error);

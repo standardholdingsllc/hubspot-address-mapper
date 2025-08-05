@@ -2,7 +2,6 @@ import { useState } from 'react';
 
 export default function MappingManager({ mappings, onMappingAdded }) {
   const [showAddForm, setShowAddForm] = useState(false);
-  const [showMappings, setShowMappings] = useState(false);
   const [formData, setFormData] = useState({
     addressStreet: '',
     company: '',
@@ -153,38 +152,23 @@ export default function MappingManager({ mappings, onMappingAdded }) {
         )}
 
         {/* View Mappings Button */}
-        <button
-          onClick={() => setShowMappings(!showMappings)}
-          className="w-full bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
+        <a
+          href="/mappings"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 text-center block"
         >
-          {showMappings ? 'Hide Mappings' : 'View All Mappings'}
-        </button>
+          🔍 Search All Mappings
+        </a>
 
-        {/* Mappings List */}
-        {showMappings && (
-          <div className="border-t pt-4 max-h-96 overflow-y-auto">
-            <h3 className="font-semibold text-gray-900 mb-3">All Mappings</h3>
-            {mappingEntries.length === 0 ? (
-              <p className="text-sm text-gray-500 italic">No mappings found.</p>
-            ) : (
-              <div className="space-y-2">
-                {mappingEntries.map(([address, mapping]) => (
-                  <div key={address} className="p-3 bg-gray-50 rounded-lg text-sm">
-                    <div className="font-medium text-gray-900 truncate" title={address}>
-                      {address}
-                    </div>
-                    <div className="text-gray-600 mt-1">
-                      <div>ID: {mapping.Company}</div>
-                      <div className="truncate" title={mapping['Company Name']}>
-                        {mapping['Company Name']}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        <a
+          href="/excluded-names"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 text-center block"
+        >
+          🚫 Manage Excluded Users
+        </a>
       </div>
     </div>
   );

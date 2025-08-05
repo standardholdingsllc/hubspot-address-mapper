@@ -143,6 +143,10 @@ export default function FileUpload({ onFileUploaded }) {
             <strong>Note:</strong> Three new columns (Company, Company Name, Lifestyle Stage) 
             will be automatically inserted after the AddressStreet column during upload.
           </p>
+          <p className="text-sm text-orange-700 mt-2">
+            <strong>Filtering:</strong> Rows with usernames in the exclusion list (Column A) 
+            will be automatically removed during upload.
+          </p>
         </div>
       </div>
     </div>
