@@ -88,21 +88,62 @@ async function updateGitHubFile(mappings) {
   }
 }
 
-function getMappings() {
-  if (runtimeMappings !== null) {
+// Function to get mappings from GitHub, local file, or in-memory storage
+async function getMappings() {
+  // First, try to get from GitHub if persistence is enabled
+  if (ENABLE_GITHUB_PERSISTENCE && GITHUB_TOKEN && GITHUB_OWNER && GITHUB_REPO) {
+    try {
+      const filePath = 'web-app/data/address_mappings.json';
+      const getFileUrl = `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${filePath}`;
+      
+      console.log(`Fetching mappings from GitHub: ${GITHUB_OWNER}/${GITHUB_REPO}/${filePath}`);
+      
+      const response = await fetch(getFileUrl, {
+        headers: {
+          'Authorization': `token ${GITHUB_TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'HubSpot-Address-Mapper'
+        }
+      });
+
+      if (response.ok) {
+        const fileData = await response.json();
+        const content = Buffer.from(fileData.content, 'base64').toString('utf-8');
+        const mappings = JSON.parse(content);
+        console.log(`Successfully loaded ${Object.keys(mappings).length} mappings from GitHub`);
+        runtimeMappings = { ...mappings }; // Update runtime cache
+        return mappings;
+      } else {
+        console.log(`GitHub mappings file not found or error: ${response.status}`);
+      }
+    } catch (error) {
+      console.log('Error fetching mappings from GitHub:', error.message);
+    }
+  }
+
+  // Fallback to local file system (for development)
+  if (!isServerless()) {
+    try {
+      const mappingsPath = path.join(process.cwd(), 'data', 'address_mappings.json');
+      const mappings = JSON.parse(fs.readFileSync(mappingsPath, 'utf8'));
+      console.log(`Successfully loaded ${Object.keys(mappings).length} mappings from local file`);
+      runtimeMappings = { ...mappings }; // Update runtime cache
+      return mappings;
+    } catch (error) {
+      console.log('Could not read local address_mappings.json:', error.message);
+    }
+  }
+
+  // Final fallback to in-memory storage
+  if (runtimeMappings) {
+    console.log(`Using in-memory mappings: ${Object.keys(runtimeMappings).length} entries`);
     return runtimeMappings;
   }
-  
-  try {
-    const mappingsPath = path.join(process.cwd(), 'data', 'address_mappings.json');
-    const mappings = JSON.parse(fs.readFileSync(mappingsPath, 'utf8'));
-    runtimeMappings = { ...mappings };
-    return runtimeMappings;
-  } catch (error) {
-    console.log('Could not read address_mappings.json, starting with empty mappings:', error.message);
-    runtimeMappings = {};
-    return runtimeMappings;
-  }
+
+  // Return empty mappings as last resort
+  console.log('No mappings found, starting with empty mappings');
+  runtimeMappings = {};
+  return {};
 }
 
 function isServerless() {
@@ -112,7 +153,7 @@ function isServerless() {
 export default async function handler(req, res) {
   if (req.method === 'GET') {
     try {
-      const mappings = getMappings();
+      const mappings = await getMappings();
       const mappingCount = Object.keys(mappings).length;
       res.status(200).json({ 
         success: true, 
@@ -143,7 +184,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Address street cannot be empty' });
       }
 
-      const mappings = getMappings();
+      const mappings = await getMappings();
       console.log('Successfully loaded', Object.keys(mappings).length, 'existing mappings');
 
       if (mappings[cleanAddressStreet]) {
