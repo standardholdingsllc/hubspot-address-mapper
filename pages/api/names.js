@@ -87,21 +87,62 @@ async function updateGitHubFile(names) {
   }
 }
 
-function getNames() {
-  if (runtimeNames !== null) {
+// Function to get names from GitHub, local file, or in-memory storage
+async function getNames() {
+  // First, try to get from GitHub if persistence is enabled
+  if (ENABLE_GITHUB_PERSISTENCE && GITHUB_TOKEN && GITHUB_OWNER && GITHUB_REPO) {
+    try {
+      const filePath = 'web-app/names.json';
+      const getFileUrl = `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${filePath}`;
+      
+      console.log(`Fetching excluded names from GitHub: ${GITHUB_OWNER}/${GITHUB_REPO}/${filePath}`);
+      
+      const response = await fetch(getFileUrl, {
+        headers: {
+          'Authorization': `token ${GITHUB_TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'HubSpot-Address-Mapper'
+        }
+      });
+
+      if (response.ok) {
+        const fileData = await response.json();
+        const content = Buffer.from(fileData.content, 'base64').toString('utf-8');
+        const names = JSON.parse(content);
+        console.log(`Successfully loaded ${names.length} excluded names from GitHub`);
+        runtimeNames = [...names]; // Update runtime cache
+        return names;
+      } else {
+        console.log(`GitHub names file not found or error: ${response.status}`);
+      }
+    } catch (error) {
+      console.log('Error fetching excluded names from GitHub:', error.message);
+    }
+  }
+
+  // Fallback to local file system (for development)
+  if (!isServerless()) {
+    try {
+      const namesPath = path.join(process.cwd(), 'names.json');
+      const names = JSON.parse(fs.readFileSync(namesPath, 'utf8'));
+      console.log(`Successfully loaded ${names.length} excluded names from local file`);
+      runtimeNames = [...names]; // Update runtime cache
+      return names;
+    } catch (error) {
+      console.log('Could not read local names.json:', error.message);
+    }
+  }
+
+  // Final fallback to in-memory storage
+  if (runtimeNames) {
+    console.log(`Using in-memory excluded names: ${runtimeNames.length} entries`);
     return runtimeNames;
   }
-  
-  try {
-    const namesPath = path.join(process.cwd(), 'names.json');
-    const names = JSON.parse(fs.readFileSync(namesPath, 'utf8'));
-    runtimeNames = [...names];
-    return runtimeNames;
-  } catch (error) {
-    console.log('Could not read names.json, starting with empty list:', error.message);
-    runtimeNames = [];
-    return runtimeNames;
-  }
+
+  // Return empty array as last resort
+  console.log('No excluded names found, starting with empty list');
+  runtimeNames = [];
+  return [];
 }
 
 function isServerless() {
@@ -111,7 +152,7 @@ function isServerless() {
 export default async function handler(req, res) {
   if (req.method === 'GET') {
     try {
-      const names = getNames();
+      const names = await getNames();
       res.status(200).json({ 
         success: true, 
         names,
@@ -141,7 +182,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Username cannot be empty' });
       }
 
-      const names = getNames();
+      const names = await getNames();
       console.log('Successfully loaded', names.length, 'existing names');
 
       if (names.includes(cleanUsername)) {
