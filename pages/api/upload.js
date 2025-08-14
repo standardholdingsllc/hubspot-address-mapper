@@ -3,6 +3,77 @@ import fs from 'fs';
 import path from 'path';
 import * as XLSX from 'xlsx';
 
+// In-memory storage for serverless environments
+let runtimeNames = null;
+
+// GitHub API integration for persistent storage
+const GITHUB_API_BASE = 'https://api.github.com';
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+const GITHUB_OWNER = process.env.GITHUB_OWNER;
+const GITHUB_REPO = process.env.GITHUB_REPO;
+const GITHUB_BRANCH = process.env.GITHUB_BRANCH || 'main';
+const ENABLE_GITHUB_PERSISTENCE = process.env.ENABLE_GITHUB_PERSISTENCE === 'true';
+
+// Helper function to determine if we're in a serverless environment
+function isServerless() {
+  return process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY;
+}
+
+// Function to get names from GitHub, local file, or in-memory storage
+async function getNames() {
+  // First, try to get from GitHub if persistence is enabled
+  if (ENABLE_GITHUB_PERSISTENCE && GITHUB_TOKEN && GITHUB_OWNER && GITHUB_REPO) {
+    try {
+      const filePath = 'web-app/names.json';
+      const getFileUrl = `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${filePath}`;
+      
+      console.log(`Fetching excluded names from GitHub: ${GITHUB_OWNER}/${GITHUB_REPO}/${filePath}`);
+      
+      const response = await fetch(getFileUrl, {
+        headers: {
+          'Authorization': `token ${GITHUB_TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'HubSpot-Address-Mapper'
+        }
+      });
+
+      if (response.ok) {
+        const fileData = await response.json();
+        const content = Buffer.from(fileData.content, 'base64').toString('utf-8');
+        const names = JSON.parse(content);
+        console.log(`Successfully loaded ${names.length} excluded names from GitHub`);
+        return names;
+      } else {
+        console.log(`GitHub names file not found or error: ${response.status}`);
+      }
+    } catch (error) {
+      console.log('Error fetching excluded names from GitHub:', error.message);
+    }
+  }
+
+  // Fallback to local file system (for development)
+  if (!isServerless()) {
+    try {
+      const namesPath = path.join(process.cwd(), 'names.json');
+      const names = JSON.parse(fs.readFileSync(namesPath, 'utf8'));
+      console.log(`Successfully loaded ${names.length} excluded names from local file`);
+      return names;
+    } catch (error) {
+      console.log('Could not read local names.json:', error.message);
+    }
+  }
+
+  // Final fallback to in-memory storage
+  if (runtimeNames) {
+    console.log(`Using in-memory excluded names: ${runtimeNames.length} entries`);
+    return runtimeNames;
+  }
+
+  // Return empty array as last resort
+  console.log('No excluded names found, starting with empty list');
+  return [];
+}
+
 export const config = {
   api: {
     bodyParser: false,
@@ -94,13 +165,12 @@ export default async function handler(req, res) {
 
     // Apply user filtering immediately after upload
     try {
-      // Read excluded names and filter directly
-      const namesPath = path.join(process.cwd(), 'names.json');
+      // Read excluded names using GitHub integration
       let excludedNames = [];
       let filterData = { success: true, removedCount: 0 };
       
       try {
-        excludedNames = JSON.parse(fs.readFileSync(namesPath, 'utf8'));
+        excludedNames = await getNames();
         
         if (excludedNames.length > 0) {
           // Filter the processed data
