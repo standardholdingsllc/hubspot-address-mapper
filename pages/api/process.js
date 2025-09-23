@@ -13,6 +13,90 @@ const GITHUB_REPO = process.env.GITHUB_REPO;
 const GITHUB_BRANCH = process.env.GITHUB_BRANCH || 'main';
 const ENABLE_GITHUB_PERSISTENCE = process.env.ENABLE_GITHUB_PERSISTENCE === 'true';
 
+// --- Customer → Company mapping helpers ---
+let runtimeCustomerCompany = null;
+
+async function getCustomerCompanyMappings() {
+  if (ENABLE_GITHUB_PERSISTENCE && GITHUB_TOKEN && GITHUB_OWNER && GITHUB_REPO) {
+    try {
+      const filePath = 'web-app/data/customer_company.json';
+      const getFileUrl = `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${filePath}`;
+      const response = await fetch(getFileUrl, {
+        headers: {
+          'Authorization': `token ${GITHUB_TOKEN}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'HubSpot-Address-Mapper'
+        }
+      });
+      if (response.ok) {
+        const fileData = await response.json();
+        const content = Buffer.from(fileData.content, 'base64').toString('utf-8');
+        const mappings = JSON.parse(content);
+        runtimeCustomerCompany = { ...mappings };
+        return mappings;
+      }
+    } catch (e) {
+      console.log('Error fetching customer_company.json from GitHub:', e.message);
+    }
+  }
+  if (!isServerless()) {
+    try {
+      const localPath = path.join(process.cwd(), 'data', 'customer_company.json');
+      const mappings = JSON.parse(fs.readFileSync(localPath, 'utf8'));
+      runtimeCustomerCompany = { ...mappings };
+      return mappings;
+    } catch {}
+  }
+  return runtimeCustomerCompany || {};
+}
+
+async function updateCustomerCompanyFile(mappings) {
+  if (!ENABLE_GITHUB_PERSISTENCE || !GITHUB_TOKEN || !GITHUB_OWNER || !GITHUB_REPO) {
+    return { success: false, reason: 'not_configured' };
+  }
+  try {
+    const filePath = 'web-app/data/customer_company.json';
+    const content = JSON.stringify(mappings, null, 2);
+    const encodedContent = Buffer.from(content).toString('base64');
+    const getUrl = `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${filePath}`;
+    const getResp = await fetch(getUrl, {
+      headers: {
+        'Authorization': `token ${GITHUB_TOKEN}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'HubSpot-Address-Mapper'
+      }
+    });
+    let sha = null;
+    if (getResp.ok) {
+      const fileData = await getResp.json();
+      sha = fileData.sha;
+    }
+    const updatePayload = {
+      message: `Update customer→company mappings (${Object.keys(mappings).length} entries)` ,
+      content: encodedContent,
+      branch: GITHUB_BRANCH,
+      ...(sha ? { sha } : {})
+    };
+    const putResp = await fetch(getUrl, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `token ${GITHUB_TOKEN}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'HubSpot-Address-Mapper'
+      },
+      body: JSON.stringify(updatePayload)
+    });
+    if (putResp.ok) {
+      const resJson = await putResp.json();
+      return { success: true, commit: resJson.commit.sha, url: resJson.commit.html_url };
+    }
+    return { success: false, reason: 'api_error', status: putResp.status };
+  } catch (e) {
+    return { success: false, reason: 'network_error', error: e.message };
+  }
+}
+
 // Helper function to determine if we're in a serverless environment
 function isServerless() {
   return process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY;
@@ -99,30 +183,40 @@ export default async function handler(req, res) {
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     const data = XLSX.utils.sheet_to_json(worksheet);
-
-    // Find the AddressStreet column name (case-insensitive)
+    
+    // Detect important columns
     const sampleRow = data[0];
-    const addressStreetColumn = Object.keys(sampleRow).find(key => 
-      key.toLowerCase().includes('addressstreet')
-    );
-
+    const addressStreetColumn = Object.keys(sampleRow).find(key => key.toLowerCase().includes('addressstreet'));
+    const customerIdColumn = Object.keys(sampleRow).find(key => key.toLowerCase().includes('unitcustomerid'));
+    
     if (!addressStreetColumn) {
       return res.status(400).json({ error: 'AddressStreet column not found in uploaded file' });
     }
 
-    // Apply mappings to fill the pre-created empty columns
+    // Load existing customer-company mappings
+    const customerCompany = await getCustomerCompanyMappings();
+    const customerCompanyUpdates = { ...customerCompany };
+
+    // Apply mappings and build customer-company map
     const processedData = data.map(row => {
       const addressStreet = row[addressStreetColumn] || '';
       const mapping = mappings[addressStreet] || {};
-      
-      // Update the existing empty columns with mapping data
       const newRow = { ...row };
       newRow.Company = mapping.Company || '';
       newRow['Company Name'] = mapping['Company Name'] || '';
       newRow['Lifestyle Stage'] = mapping.Company ? 'Worker' : '';
-      
+      // Collect customer-company
+      if (customerIdColumn && newRow[customerIdColumn] && newRow.Company) {
+        customerCompanyUpdates[newRow[customerIdColumn]] = newRow.Company;
+      }
       return newRow;
     });
+
+    // Persist customer-company map if changed
+    let customerCompanyResult = { success: false, reason: 'no_changes' };
+    if (JSON.stringify(customerCompanyUpdates) !== JSON.stringify(customerCompany)) {
+      customerCompanyResult = await updateCustomerCompanyFile(customerCompanyUpdates);
+    }
 
     // Create new workbook with processed data
     const newWorkbook = XLSX.utils.book_new();
