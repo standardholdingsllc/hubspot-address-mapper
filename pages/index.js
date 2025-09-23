@@ -149,13 +149,22 @@ export default function Home() {
                     </div>
                     
                     <div className="flex space-x-4">
-                      <a
-                        href={processingResults.downloadUrl || `/api/download?fileName=${processingResults.outputFileName}`}
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-center transition duration-200"
-                        download
-                      >
-                        Download Processed File
-                      </a>
+                      {processingResults.downloadUrl ? (
+                        <a
+                          href={processingResults.downloadUrl}
+                          className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-center transition duration-200"
+                          download={`processed_${uploadedFile?.fileName || 'file'}`}
+                        >
+                          Download Processed File
+                        </a>
+                      ) : (
+                        <button
+                          disabled
+                          className="flex-1 bg-gray-400 text-white font-bold py-3 px-6 rounded-lg cursor-not-allowed"
+                        >
+                          Preparing download...
+                        </button>
+                      )}
                       <button
                         onClick={resetProcess}
                         className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200"
