@@ -63,6 +63,7 @@ async function updateCustomerCompanyFile(mappings) {
       headers: {
         'Authorization': `token ${GITHUB_TOKEN}`,
         'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
         'User-Agent': 'HubSpot-Address-Mapper'
       }
     });
@@ -206,8 +207,8 @@ export default async function handler(req, res) {
       newRow['Company Name'] = mapping['Company Name'] || '';
       newRow['Lifestyle Stage'] = mapping.Company ? 'Worker' : '';
       // Collect customer-company
-      if (customerIdColumn && newRow[customerIdColumn] && newRow.Company) {
-        customerCompanyUpdates[newRow[customerIdColumn]] = newRow.Company;
+      if (customerIdColumn && newRow[customerIdColumn] && newRow['Company Name']) {
+        customerCompanyUpdates[newRow[customerIdColumn]] = newRow['Company Name'];
       }
       return newRow;
     });
