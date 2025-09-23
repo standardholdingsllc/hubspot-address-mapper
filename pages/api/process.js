@@ -229,10 +229,9 @@ export default async function handler(req, res) {
 
     XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, 'Processed Data');
 
-    // Generate output file
-    const outputFileName = `processed_${fileId}.xlsx`;
-    const outputFilePath = path.join('/tmp', outputFileName);
-    XLSX.writeFile(newWorkbook, outputFilePath);
+    // Generate workbook buffer and convert to base64 for direct download
+    const wbBuffer = XLSX.write(newWorkbook, { bookType: 'xlsx', type: 'buffer' });
+    const workbookBase64 = Buffer.from(wbBuffer).toString('base64');
 
     // Count matched and unmatched rows
     const matchedCount = processedData.filter(row => row.Company).length;
@@ -240,11 +239,12 @@ export default async function handler(req, res) {
 
     res.status(200).json({
       success: true,
-      outputFileName,
+      workbookBase64,
       totalRows: processedData.length,
       matchedCount,
       unmatchedCount,
-      note: 'Unmatched rows have empty Company fields. Consider using Excel conditional formatting to highlight these rows.'
+      note: 'Unmatched rows have empty Company fields. Consider using Excel conditional formatting to highlight these rows.',
+      customerCompanyPersistent: customerCompanyResult.success || false
     });
 
   } catch (error) {

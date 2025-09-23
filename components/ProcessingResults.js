@@ -20,6 +20,17 @@ export default function ProcessingResults({ fileId, onProcessingComplete, onRese
       const data = await response.json();
 
       if (data.success) {
+        // Convert base64 workbook to Blob URL for download
+        try {
+          const binary = atob(data.workbookBase64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          const url = URL.createObjectURL(blob);
+          data.downloadUrl = url;
+        } catch (e) {
+          console.error('Error creating download blob:', e);
+        }
         onProcessingComplete(data);
       } else {
         setError(data.error || 'Processing failed');

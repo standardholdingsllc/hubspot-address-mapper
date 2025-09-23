@@ -150,7 +150,7 @@ export default function Home() {
                     
                     <div className="flex space-x-4">
                       <a
-                        href={`/api/download?fileName=${processingResults.outputFileName}`}
+                        href={processingResults.downloadUrl || `/api/download?fileName=${processingResults.outputFileName}`}
                         className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-center transition duration-200"
                         download
                       >
