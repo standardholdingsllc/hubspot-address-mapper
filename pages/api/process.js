@@ -200,7 +200,7 @@ export default async function handler(req, res) {
 
     // Apply mappings and build customer-company map
     const processedData = data.map(row => {
-      const addressStreet = row[addressStreetColumn] || '';
+      const addressStreet = (row[addressStreetColumn] || '').trim();
       const mapping = mappings[addressStreet] || {};
       const newRow = { ...row };
       newRow.Company = mapping.Company || '';

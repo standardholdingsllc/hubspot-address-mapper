@@ -10,12 +10,12 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "formidable": "^3.5.1",
+    "multer": "^1.4.5-lts.1",
     "next": "^14.0.0",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
-    "xlsx": "^0.18.5",
-    "multer": "^1.4.5-lts.1",
-    "formidable": "^3.5.1"
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
@@ -28,4 +28,4 @@
     "tailwindcss": "^3.0.0",
     "typescript": "^5.0.0"
   }
-} 
+}
